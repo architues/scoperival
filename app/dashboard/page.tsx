@@ -12,6 +12,10 @@ import {
 import { PlusCircle, Users, ArrowUpRight, Activity, Eye } from "lucide-react"
 import { DashboardShell } from "@/components/dashboard/dashboard-shell"
 import Link from "next/link"
+import { getCompetitors } from "@/lib/actions/competitors"
+import { CompetitorCard } from "@/components/competitor-card"
+import { AddCompetitorModal } from "@/components/add-competitor-modal"
+import { Suspense } from "react"
 
 export default async function DashboardPage() {
   const supabase = createClient()
@@ -23,6 +27,8 @@ export default async function DashboardPage() {
   if (!session) {
     redirect("/login")
   }
+
+  const competitors = await getCompetitors()
 
   return (
     <DashboardShell>
@@ -50,7 +56,7 @@ export default async function DashboardPage() {
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">0</div>
+                <div className="text-2xl font-bold">{competitors.length}</div>
                 <p className="text-xs text-muted-foreground">
                   +0% from last month
                 </p>
@@ -115,8 +121,26 @@ export default async function DashboardPage() {
                 <CardTitle>Competitors</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-center h-[200px] text-muted-foreground">
-                  No competitors added yet
+                <div className="flex justify-between items-center">
+                  <h2 className="text-3xl font-bold">Competitors</h2>
+                  <AddCompetitorModal onSuccess={() => {}} />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <Suspense fallback={<div>Loading competitors...</div>}>
+                    {competitors.length === 0 ? (
+                      <div className="col-span-full text-center py-12 text-muted-foreground">
+                        No competitors added yet. Add your first competitor to start monitoring.
+                      </div>
+                    ) : (
+                      competitors.map((competitor) => (
+                        <CompetitorCard
+                          key={competitor.id}
+                          competitor={competitor}
+                          onDelete={() => {}}
+                        />
+                      ))
+                    )}
+                  </Suspense>
                 </div>
               </CardContent>
             </Card>
