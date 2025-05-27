@@ -1,162 +1,120 @@
-import { createClient } from "@/utils/supabase/server"
-import { redirect } from "next/navigation"
-import { DashboardHeader } from "@/components/dashboard/dashboard-header"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-import { PlusCircle, Users, ArrowUpRight, Activity, Eye } from "lucide-react"
-import { DashboardShell } from "@/components/dashboard/dashboard-shell"
-import Link from "next/link"
-import { getCompetitors } from "@/lib/actions/competitors"
-import { CompetitorCard } from "@/components/competitor-card"
-import { AddCompetitorModal } from "@/components/add-competitor-modal"
-import { Suspense } from "react"
+"use client";
 
-export default async function DashboardPage() {
-  const supabase = createClient()
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { addCompetitor, getCompetitors } from "@/app/actions/competitors";
+import { Competitor } from "@/types/database";
+import { toast } from "sonner";
+import { PricingModal } from "@/components/pricing-modal";
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+export default function DashboardPage() {
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [competitors, setCompetitors] = useState<Competitor[]>([]);
+  const [showPricingModal, setShowPricingModal] = useState(false);
 
-  if (!session) {
-    redirect("/login")
+  // Load competitors on mount
+  useEffect(() => {
+    loadCompetitors();
+  }, []);
+
+  async function loadCompetitors() {
+    try {
+      const data = await getCompetitors();
+      setCompetitors(data);
+    } catch (error) {
+      console.error("Error loading competitors:", error);
+      toast.error("Failed to load competitors");
+    }
   }
 
-  const competitors = await getCompetitors()
+  async function handleAddCompetitor(formData: FormData) {
+    try {
+      setIsLoading(true);
+      const name = formData.get("name") as string;
+      const url = formData.get("url") as string;
+
+      await addCompetitor(name, url);
+      toast.success("Competitor added successfully");
+      formData.set("name", "");
+      formData.set("url", "");
+      loadCompetitors();
+    } catch (error) {
+      if (error instanceof Error && error.message === "UPGRADE_REQUIRED") {
+        setShowPricingModal(true);
+      } else {
+        toast.error(error instanceof Error ? error.message : "Failed to add competitor");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   return (
-    <DashboardShell>
-      <DashboardHeader heading="Dashboard" text="Overview of your competitor tracking.">
-        <Link href="/dashboard/competitors/new">
-          <Button>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Competitor
-          </Button>
-        </Link>
-      </DashboardHeader>
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
-        </TabsList>
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Competitors
-                </CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{competitors.length}</div>
-                <p className="text-xs text-muted-foreground">
-                  +0% from last month
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Recent Changes
-                </CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">
-                  +0% from last month
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Checks
-                </CardTitle>
-                <Eye className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">
-                  +0% from last month
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Active Status
-                </CardTitle>
-                <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">Active</div>
-                <p className="text-xs text-muted-foreground">
-                  All systems operational
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <Card className="col-span-4">
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-              </CardHeader>
-              <CardContent className="pl-2">
-                <div className="flex items-center justify-center h-[200px] text-muted-foreground">
-                  No recent activity to display
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="col-span-3">
-              <CardHeader>
-                <CardTitle>Competitors</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-center">
-                  <h2 className="text-3xl font-bold">Competitors</h2>
-                  <AddCompetitorModal onSuccess={() => {}} />
-                </div>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <Suspense fallback={<div>Loading competitors...</div>}>
-                    {competitors.length === 0 ? (
-                      <div className="col-span-full text-center py-12 text-muted-foreground">
-                        No competitors added yet. Add your first competitor to start monitoring.
-                      </div>
-                    ) : (
-                      competitors.map((competitor) => (
-                        <CompetitorCard
-                          key={competitor.id}
-                          competitor={competitor}
-                          onDelete={() => {}}
-                        />
-                      ))
-                    )}
-                  </Suspense>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        <TabsContent value="analytics" className="space-y-4">
-          <div className="flex items-center justify-center h-[400px] text-muted-foreground">
-            Analytics data will appear here
-          </div>
-        </TabsContent>
-        <TabsContent value="reports" className="space-y-4">
-          <div className="flex items-center justify-center h-[400px] text-muted-foreground">
-            Reports will appear here
-          </div>
-        </TabsContent>
-      </Tabs>
-    </DashboardShell>
-  )
+    <div className="container py-12">
+      <div className="grid gap-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Add Competitor</CardTitle>
+            <CardDescription>
+              Monitor changes to your competitor's website
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={handleAddCompetitor} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  placeholder="Enter competitor name"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="url">URL</Label>
+                <Input
+                  id="url"
+                  name="url"
+                  type="url"
+                  placeholder="https://example.com"
+                  required
+                />
+              </div>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? "Adding..." : "Add Competitor"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-4">
+          <h2 className="text-2xl font-bold">Your Competitors</h2>
+          {competitors.length === 0 ? (
+            <p className="text-muted-foreground">No competitors added yet</p>
+          ) : (
+            <div className="grid gap-4">
+              {competitors.map((competitor) => (
+                <Card key={competitor.id}>
+                  <CardContent className="p-6">
+                    <h3 className="font-semibold">{competitor.name}</h3>
+                    <p className="text-sm text-muted-foreground">{competitor.url}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <PricingModal 
+        open={showPricingModal} 
+        onOpenChange={setShowPricingModal} 
+      />
+    </div>
+  );
 }

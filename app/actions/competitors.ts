@@ -34,6 +34,22 @@ export async function addCompetitor(name: string, url: string): Promise<Competit
     throw new Error("Not authenticated");
   }
 
+  // Check competitor limit
+  const { count, error: countError } = await supabase
+    .from("competitors")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", user.id);
+
+  if (countError) {
+    console.error("Error checking competitor count:", countError);
+    throw new Error("Failed to check competitor limit");
+  }
+
+  // Free tier limit: 1 competitor
+  if (count && count >= 1) {
+    throw new Error("UPGRADE_REQUIRED");
+  }
+
   // Validate URL
   try {
     new URL(url);
